@@ -52,7 +52,7 @@ def fetch_youtube_metadata(youtube_url: str) -> Dict:
         raise HTTPException(status_code=500, detail=f"Error fetching metadata: {str(e)}")
 
 # Upload a new YouTube video
-@router.post("/videos")
+@router.post("/")   
 async def upload_video(video: VideoCreate, user: dict = Depends(get_current_user)):
     if user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can upload videos")
@@ -97,12 +97,20 @@ async def get_videos(user: dict = Depends(get_current_user)):  # ✅ Requires au
 
 
 # Delete a video
-@router.delete("/videos/{video_id}")
+@router.delete("/{video_id}")  # ✅ Corrected path
 async def delete_video(video_id: str, user: dict = Depends(get_current_user)):
+    # 🔹 Fetch the video from the database
     video = await videos_collection.find_one({"_id": ObjectId(video_id)})
+
+    # 🔹 If video not found, return 404 error
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    # 🔹 Check if the current user is the uploader
     if user["role"] != "doctor" or user["user_id"] != video["uploaded_by"]:
         raise HTTPException(status_code=403, detail="Unauthorized to delete this video")
+
+    # 🔹 Delete the video
     await videos_collection.delete_one({"_id": ObjectId(video_id)})
+
     return {"message": "Video deleted successfully"}
