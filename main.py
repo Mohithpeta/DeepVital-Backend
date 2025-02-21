@@ -9,7 +9,7 @@ load_dotenv()
 
 app = FastAPI(title="Video Streaming Platform")
 
-#  CORS Configuration
+# CORS Configuration
 origins = [
     "http://localhost:5173",  # React Frontend
     "http://127.0.0.1:5173",
@@ -19,18 +19,18 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (GET, POST, DELETE, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-#  Include API Routes
+# Include API Routes
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(video_router, prefix="/videos", tags=["Videos"])
 app.include_router(youtube_router, prefix="/youtube", tags=["YouTube"])
 
-#  Root Endpoint with Access-Control Headers
+# Root Endpoint with Access-Control Headers
 @app.get("/")
 def home(request: Request, response: Response):
     response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")

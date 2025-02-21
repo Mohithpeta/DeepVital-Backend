@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models import VideoCreate
-from database import videos_collection
+from database import videos_collection, users_collection, doctors_collection
 from utils.security import get_current_user
 from bson import ObjectId
 from typing import List, Dict
@@ -52,7 +52,7 @@ def fetch_youtube_metadata(youtube_url: str) -> Dict:
         raise HTTPException(status_code=500, detail=f"Error fetching metadata: {str(e)}")
 
 # Upload a new YouTube video
-@router.post("/")   
+@router.post("/")
 async def upload_video(video: VideoCreate, user: dict = Depends(get_current_user)):
     if user["role"] != "doctor":
         raise HTTPException(status_code=403, detail="Only doctors can upload videos")
@@ -69,48 +69,60 @@ async def upload_video(video: VideoCreate, user: dict = Depends(get_current_user
         "thumbnail": youtube_metadata["thumbnail"],
     }
     result = await videos_collection.insert_one(video_data)
-    video_data["_id"] = str(result.inserted_id)  # Convert ObjectId to string
+    video_data["_id"] = str(result.inserted_id)
     return {
         "message": "Video uploaded successfully",
         "video": video_data
     }
 
-# Get all videos
+# Get all videos with watch history-based recommendations
 @router.get("/")
-async def get_videos(user: dict = Depends(get_current_user)):  # ✅ Requires authentication
+async def get_videos(user: dict = Depends(get_current_user)):
     try:
+        # Fetch videos based on user role
         if user["role"] == "doctor":
-            # ✅ Doctors see only their videos
+            # Doctors see only their videos
             videos = await videos_collection.find({"uploaded_by": user["user_id"]}).to_list(1000)
         else:
-            # ✅ Users see all videos
+            # Users see all videos
             videos = await videos_collection.find().to_list(1000)
-            
 
-        # Convert `_id` to string
+        # Convert `_id` to string for all videos
         formatted_videos = [{**video, "_id": str(video["_id"])} for video in videos]
+
+        # If user is not a doctor, sort based on watch history
+        if user["role"] != "doctor":
+            # Fetch user's watch history
+            user_data = await users_collection.find_one({"_id": ObjectId(user["user_id"])})
+            if not user_data:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            watch_history = user_data.get("watch_history", [])
+            # Sort videos: watched videos come first
+            formatted_videos.sort(
+                key=lambda x: -1 if x["_id"] in watch_history else 0
+            )
+
         return formatted_videos
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving videos: {str(e)}")
 
-
-
 # Delete a video
-@router.delete("/{video_id}")  # ✅ Corrected path
+@router.delete("/{video_id}")
 async def delete_video(video_id: str, user: dict = Depends(get_current_user)):
-    # 🔹 Fetch the video from the database
+    # Fetch the video from the database
     video = await videos_collection.find_one({"_id": ObjectId(video_id)})
 
-    # 🔹 If video not found, return 404 error
+    # If video not found, return 404 error
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    # 🔹 Check if the current user is the uploader
+    # Check if the current user is the uploader
     if user["role"] != "doctor" or user["user_id"] != video["uploaded_by"]:
         raise HTTPException(status_code=403, detail="Unauthorized to delete this video")
 
-    # 🔹 Delete the video
+    # Delete the video
     await videos_collection.delete_one({"_id": ObjectId(video_id)})
 
     return {"message": "Video deleted successfully"}
