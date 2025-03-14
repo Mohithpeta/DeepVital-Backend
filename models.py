@@ -7,6 +7,7 @@ class UserCreate(BaseModel):
     password: str
     name: str
     phone: str
+    profile_picture: Optional[str] = None  # URL or file path for profile picture
     deliveryStatus: Optional[str] = None  # 'postpartum', 'preconception', 'pregnancy'
     role: str  # 'user' or 'doctor'
 
@@ -19,6 +20,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     phone: str
+    profile_picture: Optional[str] = None
     role: str
     deliveryStatus: Optional[str] = None
 
@@ -28,4 +30,4 @@ class VideoCreate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     category: str  # 'Postpartum', 'Preconception', 'Pregnancy'
-    # uploaded_by: str  # Doctor's user ID
+    thumbnail: Optional[str] = None  # URL or file path for thumbnail
